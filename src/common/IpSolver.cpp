@@ -2,6 +2,7 @@
 #include <stdexcept>
 #include <numeric>
 #include <iostream>
+#include <algorithm>
 
 namespace ips {
 bool IpSolver::next_choice() {
@@ -17,25 +18,29 @@ bool IpSolver::next_choice() {
 }
 ResultStatus IpSolver::Solve() {
     if (not ReFormula()) return NOT_SOLVED;
-//    std::cout << "vars:\n" << to_string_or_variables() << std::endl;
-//    std::cout << "obj: " << to_string_or_objective() << std::endl;
-//    std::cout << "cons:\n" << to_string_or_constraint() << std::endl;
+    std::cout << "vars:\n" << to_string_or_variables() << std::endl;
+    std::cout << "obj: " << to_string_or_objective() << std::endl;
+    std::cout << "cons:\n" << to_string_or_constraint() << std::endl;
     m_obj_value = std::numeric_limits<int64_t>::max();
 
-    m_var_n = m_vars.size();
-    max_choice_count.resize(m_var_n);
-    choice.resize(m_var_n);
+    int var_num = m_var_n - m_var_offset;
+    if (var_num == 0) {
+        // TODO check if no var left
+    }
+    max_choice_count.resize(var_num);
+    choice.resize(var_num);
     std::fill(choice.begin(), choice.end(), 0);
-    values.resize(m_var_n);
+    values.resize(var_num);
     uint64_t cnt = 0, total = 1;
-    for (size_t i = 0; i < m_var_n; i++) {
-        max_choice_count[i] = m_vars[i].m_len;
+    for (int32_t i = 0; i < var_num; i++) {
+        int32_t idx = m_var_sorts[m_var_offset + i].idx;
+        max_choice_count[i] = m_vars[idx].m_len;
         total *= m_vars[i].m_len;
-        values[i] = m_vars[i].m_lb;
+        values[i] = m_vars[idx].m_lb;
     }
 
     do {
-        for (size_t i = 0; i < m_var_n; i++) {
+        for (int32_t i = 0; i < m_var_n; i++) {
             values[i] = m_vars[i].m_lb + m_v_tick_size * choice[i];
         }
         int64_t diff = calc_constrains();
@@ -47,9 +52,9 @@ ResultStatus IpSolver::Solve() {
             }
         }
         cnt++;
-//        if (cnt % 1000 == 0) {
-//            printf("n=%zu/%zu\n", cnt, total);
-//        }
+        if (cnt % 10000 == 0) {
+            printf("n=%zu/%zu\n", cnt, total);
+        }
     } while (next_choice());
     if (m_obj_value != std::numeric_limits<int64_t>::max()) return OPTIMAL;
     else return NOT_SOLVED;
@@ -57,7 +62,7 @@ ResultStatus IpSolver::Solve() {
 
 int64_t IpSolver::calc_objective() {
     int64_t result = 0;
-    for (uint64_t j = 0; j < m_var_n; ++j) {
+    for (int j = 0; j < m_var_n; ++j) {
         result += m_obj_coefs[j] * values[j];
     }
     return result;
@@ -68,7 +73,7 @@ int64_t IpSolver::calc_constrains() {
     for (uint64_t i = 0; i < m_cons_cnt; ++i) {
         int64_t tmp = 0;
         const auto& coefs = m_cons[i].m_coefs;
-        for (uint64_t j = 0; j < m_var_n; ++j) {
+        for (int j = 0; j < m_var_n; ++j) {
             tmp += coefs[j] * values[j];
         }
         result += std::abs(tmp - m_cons[i].m_lb);
@@ -142,15 +147,15 @@ bool IpSolver::ReFormula() {
                     if (m_cons[k].m_coefs[j] <= 0) neg_cnt++;
                 }
                 if (neg_cnt == m_cons_cnt) {
-                    if (m_vars[j].IsBoundOneSide()) {
-                        m_vars[j].SetBound(-m_vars[j].m_ub, -m_vars[j].m_lb);
-                    } else {
+                    if (!m_vars[j].IsBoundOneSide()) {
                         throw std::runtime_error("expect var " + std::to_string(j) + " Bound One Side");
                     }
+                    m_vars[j].SetBound(-m_vars[j].m_ub, -m_vars[j].m_lb);
                     for (size_t k = 0; k < m_cons_cnt; k++) {
                         m_cons[k].m_coefs[j] = -m_cons[k].m_coefs[j];
                     }
                     m_vars[j].isNeg = true;
+                    m_obj_coefs[j] = -m_obj_coefs[j];
                 } else {
                     throw std::runtime_error("expect all constrains' coef " + std::to_string(j) + " <= 0");
                 }
@@ -168,6 +173,33 @@ bool IpSolver::ReFormula() {
         }
         m_vars[j].m_len = (m_vars[j].m_ub - m_vars[j].m_lb) / m_v_tick_size + 1L;
     }
+
+    m_var_n = var_n;
+    for (int32_t i = 0; i < m_var_n; i++) {
+        m_var_sorts.push_back(VarSort{i, m_vars[i].m_len});
+    }
+    std::sort(m_var_sorts.begin(), m_var_sorts.end(), [](auto& l, auto& r) {
+        return l.len < r.len;
+    });
+    std::vector<int64_t> tmp(m_var_n);
+    reorder(m_obj_coefs.data(), tmp.data(), m_var_sorts.data(), m_var_n);
+    for (size_t i = 0; i < m_cons_cnt; i++) {
+        auto& coefs = m_cons[i].m_coefs;
+        reorder(coefs.data(), tmp.data(), m_var_sorts.data(), m_var_n);
+    }
+    for (; m_var_offset < m_var_n; m_var_offset++) {
+        if (m_var_sorts[m_var_offset].len > 1) {
+            break;
+        }
+    }
+    for (int i = 0; i < m_var_offset; i++) {
+        for (size_t j = 0; j < m_cons_cnt; j++) {
+            int64_t val_ = m_vars[m_var_sorts[i].idx].m_lb * m_cons[j].m_coefs[i];
+            m_cons[j].m_lb -= val_;
+            m_cons[j].m_ub -= val_;
+        }
+    }
+    
     return true;
 }
 
@@ -194,14 +226,23 @@ void IpSolver::SetConstraintCoefs(int c_idx, const std::vector<int64_t>& coefs) 
     m_cons[c_idx].m_coefs = coefs;
 }
 void IpSolver::SetObjectiveCoefs(const std::vector<int64_t>& coefs) {
+    if (coefs.size() != m_obj_coefs.size()) {
+        throw std::runtime_error("SetObjectiveCoefs size incorrect!");
+    }
     m_obj_coefs = coefs;
 }
 void IpSolver::SetVarBounds(const std::vector<int64_t>& lbs, const std::vector<int64_t>& ubs) {
+    if (lbs.size() != m_vars.size() || ubs.size() != m_vars.size()) {
+        throw std::runtime_error("SetVarBounds size incorrect!");
+    }
     for (uint64_t i = 0; i < lbs.size(); ++i) {
         m_vars[i].SetBound(lbs[i], ubs[i]);
     }
 }
 void IpSolver::SetConstraintBounds(const std::vector<int64_t>& lbs, const std::vector<int64_t>& ubs) {
+    if (lbs.size() != m_cons.size() || ubs.size() != m_cons.size()) {
+        throw std::runtime_error("SetConstraintBounds size incorrect!");
+    }
     for (uint64_t i = 0; i < lbs.size(); ++i) {
         m_cons[i].SetBound(lbs[i], ubs[i]);
     }

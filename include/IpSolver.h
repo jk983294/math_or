@@ -35,7 +35,9 @@ private:
 
 public:
     uint64_t m_cons_cnt{0};
-    uint64_t m_var_n{0};
+    int m_var_n{0};
+    int m_var_offset{0};
+    std::vector<VarSort> m_var_sorts;
     std::vector<IpVar> m_vars;
     std::vector<IpConstraint> m_cons;
     std::vector<int64_t> m_obj_coefs;
