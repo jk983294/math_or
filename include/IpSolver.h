@@ -5,34 +5,37 @@
 #include <vector>
 #include <string>
 #include <IpStructs.h>
+#include <IpSolverApi.h>
 
 namespace ips {
-struct IpSolver {
-    void MakeIntVar(int n);
-    void SetVarBound(int idx, int64_t lb, int64_t ub);
-    void MakeRowConstraint(int n);
-    void SetConstraintBound(int idx, int64_t lb, int64_t ub);
-    void SetConstraintCoef(int c_idx, int v_idx, int64_t coef);
-    void SetConstraintCoefs(int c_idx, const std::vector<int64_t>& coefs);
-    void SetObjectiveCoef(int idx, int coef);
-    ResultStatus Solve();
-    int64_t ObjValue() const;
-    std::vector<int64_t> Solution() const;
+struct IpSolver final : public IpSolverApi {
+    void init(int n_var, int n_constraint) final;
+    void SetVarBound(int idx, int64_t lb, int64_t ub) final;
+    void SetConstraintBound(int idx, int64_t lb, int64_t ub) final;
+    void SetConstraintCoef(int c_idx, int v_idx, int64_t coef) final;
+    void SetObjectiveCoefs(const std::vector<int64_t>& coefs) final;
+    void SetVarBounds(const std::vector<int64_t>& lbs, const std::vector<int64_t>& ubs) final;
+    void SetConstraintBounds(const std::vector<int64_t>& lbs, const std::vector<int64_t>& ubs) final;
+    void SetConstraintCoefs(int c_idx, const std::vector<int64_t>& coefs) final;
+    void SetObjectiveCoef(int idx, int coef) final;
+    ResultStatus Solve() final;
+    int64_t ObjValue() const final;
+    const int64_t* Solution() const final;
 
-    std::string to_string_or_variables();
-    std::string to_string_or_constraint();
-    std::string to_string_or_objective();
-    std::string to_string_or_solution();
+    std::string to_string_or_variables() final;
+    std::string to_string_or_constraint() final;
+    std::string to_string_or_objective() final;
+    std::string to_string_or_solution() final;
 
 private:
     bool ReFormula();
     bool next_choice();
+    int64_t calc_constrains();
+    int64_t calc_objective();
 
 public:
-    int64_t m_v_tick_size{100};
-    int64_t m_p_tick_size{100};
-    int64_t m_obj_value{0};
     uint64_t m_cons_cnt{0};
+    uint64_t m_var_n{0};
     std::vector<IpVar> m_vars;
     std::vector<IpConstraint> m_cons;
     std::vector<int64_t> m_obj_coefs;

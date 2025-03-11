@@ -5,16 +5,7 @@
 #include <vector>
 
 namespace ips {
-enum ResultStatus {
-    /// optimal.
-    OPTIMAL,
-    /// feasible, or stopped by limit.
-    FEASIBLE,
-    /// the model is trivially invalid (NaN coefficients, etc).
-    INFEASIBLE,
-    /// not been solved yet.
-    NOT_SOLVED
-};
+
 
 struct IpVar {
     bool isNeg{false};

@@ -7,7 +7,7 @@ using namespace ips;
 
 int main() {
     IpSolver solver;
-    solver.MakeIntVar(6);
+    solver.init(6, 4);
     solver.SetVarBound(0, 1600, 5900);
     solver.SetVarBound(1, 3000, 7300);
     solver.SetVarBound(2, 0, 4300);
@@ -20,7 +20,6 @@ int main() {
     solver.SetObjectiveCoef(3, 1);
     solver.SetObjectiveCoef(4, 1);
     solver.SetObjectiveCoef(5, 1);
-    solver.MakeRowConstraint(4);
     solver.SetConstraintCoefs(0, {1L, 1L, 1L, -1L, -1L, -1L});
     solver.SetConstraintCoefs(1, {153900L, 154000L, 154600L, -153900L, -154000L, -154600L});
     solver.SetConstraintCoef(2, 0, 1);
