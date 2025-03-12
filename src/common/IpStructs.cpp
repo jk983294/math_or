@@ -1,18 +1,6 @@
 #include <IpSolver.h>
 
 namespace ips {
-void IpVar::Clear() {
-    isNeg = false;
-    m_lb = 0;
-    m_ub = 0;
-}
-void IpVar::SetBound(int64_t lb, int64_t ub) {
-    m_lb = lb;
-    m_ub = ub;
-}
-bool IpVar::IsBoundOneSide() const {
-    return m_lb * m_ub >= 0;
-}
 void IpConstraint::SetBound(int64_t lb, int64_t ub) {
     m_lb = lb;
     m_ub = ub;
@@ -22,7 +10,6 @@ void IpConstraint::Resize(int n_vars) {
     std::fill(m_coefs.begin(), m_coefs.end(), 0);
 }
 void IpConstraint::Clear() {
-    m_valid = true;
     m_lb = 0;
     m_ub = 0;
     m_coefs.clear();

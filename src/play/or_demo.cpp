@@ -7,27 +7,19 @@ using namespace ips;
 
 int main() {
     IpSolver solver;
-    solver.init(6, 4);
-    solver.SetVarBound(0, 1600, 5900);
-    solver.SetVarBound(1, 3000, 7300);
-    solver.SetVarBound(2, 0, 4300);
-    solver.SetVarBound(3, 0, 0);
-    solver.SetVarBound(4, 0, 0);
-    solver.SetVarBound(5, 0, 0);
-    solver.SetObjectiveCoef(0, 1);
-    solver.SetObjectiveCoef(1, 1);
-    solver.SetObjectiveCoef(2, 1);
-    solver.SetObjectiveCoef(3, 1);
-    solver.SetObjectiveCoef(4, 1);
-    solver.SetObjectiveCoef(5, 1);
-    solver.SetConstraintCoefs(0, {1L, 1L, 1L, -1L, -1L, -1L});
-    solver.SetConstraintCoefs(1, {153900L, 154000L, 154600L, -153900L, -154000L, -154600L});
-    solver.SetConstraintCoef(2, 0, 1);
-    solver.SetConstraintCoef(3, 3, -1);
-    solver.SetConstraintBound(0, 8900, 8900);
-    solver.SetConstraintBound(1, 1370390000L, 1370390000L);
-    solver.SetConstraintBound(2, 1700, 5900);
-    solver.SetConstraintBound(3, 0, 0);
+    // solver.init(6, 2);
+    // solver.SetVarBounds({1700L, 3000L, 0L, 0L, 0L, 0L}, {5900L, 7300L, 4300L, 0L, 0L, 0L});
+    // solver.SetObjectiveCoefs({1L, 2L, 8L, 1L, 2L, 8L});
+    // solver.SetConstraintCoefs(0, {1L, 1L, 1L, -1L, -1L, -1L});
+    // solver.SetConstraintCoefs(1, {153900L, 154000L, 154600L, -153900L, -154000L, -154600L});
+    // solver.SetConstraintBounds({8900L, 1370390000L}, {8900L, 1370390000L});
+
+    solver.init(10, 2);
+    solver.SetVarBounds({1100L, 100L, 1700L, 0L, 0L, 0L, 0L, 0L, 0L, 0L}, {21400L, 20600L, 22200L, 17100L, 14200L, 0L, 0L, 0L, 3400L, 6300L});
+    solver.SetObjectiveCoefs({1L, 6L, 8L, 11L, 19L, 1L, 6L, 8L, 11L, 19L});
+    solver.SetConstraintCoefs(0, {1L, 1L, 1L, 1L, 1L, -1L, -1L, -1L, -1L, -1L});
+    solver.SetConstraintCoefs(1, {276000L, 276500L, 276700L, 277000L, 277800L, -276000L, -276500L, -276700L, -277000L, -277800L});
+    solver.SetConstraintBounds({13500L, 3736620000L}, {13500L, 3736620000L});
 
     std::cout << "vars:\n" << solver.to_string_or_variables() << std::endl;
     std::cout << "obj: " << solver.to_string_or_objective() << std::endl;
@@ -47,7 +39,7 @@ int main() {
         printf("Objective value = %ld\n", solver.ObjValue());
         printf("x = %s\n", solver.to_string_or_solution().c_str());
         // printf("Problem solved in %ld ms\n", solver->wall_time());
-        // printf("Problem solved in %ld iterations\n", solver->iterations());
+        printf("Problem solved in %ld iterations\n", solver.iterations());
         // printf("Problem solved in %ld branch-and-bound nodes\n", solver->nodes());
         auto duration = std::chrono::duration_cast<std::chrono::microseconds>(t1 - t0);
         std::cout << "time: " << duration.count() << " us\n";

@@ -30,6 +30,7 @@ struct IpSolverApi {
     virtual ResultStatus Solve() = 0;
     virtual int64_t ObjValue() const = 0;
     virtual const int64_t* Solution() const = 0;
+    uint64_t iterations() const { return m_calc_cnt; }
 
     virtual std::string to_string_or_variables() = 0;
     virtual std::string to_string_or_constraint() = 0;
@@ -39,5 +40,6 @@ struct IpSolverApi {
     int64_t m_v_tick_size{100};
     int64_t m_p_tick_size{100};
     int64_t m_obj_value{0};
+    uint64_t m_calc_cnt{0};
 };
 }

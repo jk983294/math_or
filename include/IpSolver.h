@@ -29,27 +29,27 @@ struct IpSolver final : public IpSolverApi {
 
 private:
     bool ReFormula();
-    bool next_choice();
-    int64_t calc_constrains();
+    void calc_constrains();
+    void fill_value();
     int64_t calc_objective();
-    void update_best();
 
 public:
-    uint64_t m_cons_cnt{0};
     int m_var_n{0};
     int m_var_offset{0};
-    std::vector<VarSort> m_var_sorts;
-    std::vector<IpVar> m_vars;
+    
+    int64_t m_vol_target{0};
+    int64_t m_amt_target{0};
+    int64_t m_vol_diff{0};
+    int64_t m_amt_diff{0};
     std::vector<IpConstraint> m_cons;
     std::vector<int64_t> m_obj_coefs;
     std::vector<int64_t> m_solution;
-    std::vector<int64_t> m_fix_solution;
     std::vector<int64_t> values;
-    std::vector<int64_t> m_lbs;
-    std::vector<int64_t> m_diffs;
-    std::vector<int> m_idx;
+    std::vector<int64_t> m_lbs; // var's lb
+    std::vector<int64_t> m_ubs; // var's ub
+    std::vector<int> m_var_reorder_idx;
     std::vector<int> m_lens;
-    std::vector<int> max_choice_count;
     std::vector<int> choice;
+    std::vector<int> m_solution_idx;
 };
 }
