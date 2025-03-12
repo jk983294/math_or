@@ -34,10 +34,16 @@ struct IpConstraint {
 };
 
 template <typename T>
-void reorder(T* data, T* buffer, const VarSort* order, int len) {
+void reorder_inplace(T* data, T* buffer, const VarSort* order, int len) {
     for (int i = 0; i < len; i++) {
         buffer[i] = data[order[i].idx];
     }
     std::copy(buffer, buffer + len, data);
+}
+template <typename T>
+void reorder(const T* src, T* dest, const VarSort* order, int len) {
+    for (int i = 0; i < len; i++) {
+        dest[order[i].idx] = src[i];
+    }
 }
 }

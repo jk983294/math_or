@@ -32,6 +32,7 @@ private:
     bool next_choice();
     int64_t calc_constrains();
     int64_t calc_objective();
+    void update_best();
 
 public:
     uint64_t m_cons_cnt{0};
@@ -42,7 +43,12 @@ public:
     std::vector<IpConstraint> m_cons;
     std::vector<int64_t> m_obj_coefs;
     std::vector<int64_t> m_solution;
+    std::vector<int64_t> m_fix_solution;
     std::vector<int64_t> values;
+    std::vector<int64_t> m_lbs;
+    std::vector<int64_t> m_diffs;
+    std::vector<int> m_idx;
+    std::vector<int> m_lens;
     std::vector<int> max_choice_count;
     std::vector<int> choice;
 };
