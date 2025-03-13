@@ -21,6 +21,13 @@ int main() {
     solver.SetConstraintCoefs(1, {276000L, 276500L, 276700L, 277000L, 277800L, -276000L, -276500L, -276700L, -277000L, -277800L});
     solver.SetConstraintBounds({13500L, 3736620000L}, {13500L, 3736620000L});
 
+    // solver.init(4, 2);
+    // solver.SetVarBounds({30300L, 0L, 0L, 0L}, {82800L, 31100L, 0L, 21900L});
+    // solver.SetObjectiveCoefs({1L, 2L, 1L, 2L});
+    // solver.SetConstraintCoefs(0, {1L, 1L, -1L, -1L});
+    // solver.SetConstraintCoefs(1, {72600L, 72700L, -72600L, -72700L});
+    // solver.SetConstraintBounds({60900L, 4421300000L}, {60900L, 4421300000L});
+
     std::cout << "vars:\n" << solver.to_string_or_variables() << std::endl;
     std::cout << "obj: " << solver.to_string_or_objective() << std::endl;
     std::cout << "cons:\n" << solver.to_string_or_constraint() << std::endl;

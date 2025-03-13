@@ -31,16 +31,18 @@ private:
     bool ReFormula();
     void calc_constrains();
     void fill_value();
+    void fill_solution();
     int64_t calc_objective();
 
 public:
     int m_var_n{0};
-    int m_var_offset{0};
+    int m_real_n{0};
     
     int64_t m_vol_target{0};
     int64_t m_amt_target{0};
     int64_t m_vol_diff{0};
     int64_t m_amt_diff{0};
+    int64_t m_avg_px{0};
     std::vector<IpConstraint> m_cons;
     std::vector<int64_t> m_obj_coefs;
     std::vector<int64_t> m_solution;

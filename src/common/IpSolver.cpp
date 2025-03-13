@@ -13,21 +13,43 @@ ResultStatus IpSolver::Solve() {
     std::cout << "cons:\n" << to_string_or_constraint() << std::endl;
     m_obj_value = std::numeric_limits<int64_t>::max();
 
-    int var_num = m_var_n - m_var_offset;
+    int var_num = m_real_n;
     if (var_num == 0) {
-        // TODO check if no var left
+        if (m_amt_target == 0 && m_vol_target == 0) {
+            fill_solution();
+            return OPTIMAL;
+        } else {
+            return NOT_SOLVED;
+        }
+    }
+    if (m_amt_target < 0 || m_vol_target < 0) {
+        throw std::runtime_error("should not happen!");
+    }
+    m_avg_px = m_amt_target / m_vol_target;
+    bool check_avg_px = false;
+    if (m_amt_target % m_vol_target == 0) {
+        check_avg_px = true;
     }
     choice.resize(m_var_n, 0);
     m_solution_idx.resize(m_var_n, 0);
     values.resize(m_var_n);
     uint64_t total = 1;
     m_calc_cnt = 0;
-    for (int32_t i = m_var_offset; i < m_var_n - 1; i++) {
+    for (int32_t i = 0; i < var_num - 1; i++) {
         total *= m_lens[i];
     }
-    auto* pChoice = choice.data() + m_var_offset;
-    auto* pMaxChoice = m_lens.data() + m_var_offset;
-    auto* pValue = values.data() + m_var_offset;
+    auto* pChoice = choice.data();
+    auto* pMaxChoice = m_lens.data();
+    auto* pValue = values.data();
+    auto* pAmtCoef = m_cons[1].m_coefs.data();
+
+    int pass_avg_idx = 0;
+    for (; pass_avg_idx < var_num; pass_avg_idx++) {
+        if (pAmtCoef[pass_avg_idx] >= m_avg_px) break;
+    }
+    if (var_num == pass_avg_idx) return NOT_SOLVED;
+
+    printf("avg_px=%ld, check_avg_px=%d\n", m_avg_px, check_avg_px);
 
     int64_t vol_lb = 0;
     { // to lower bound
@@ -49,8 +71,8 @@ ResultStatus IpSolver::Solve() {
                 break;
             } else {
                 pChoice[idx_] = max_len - 1;
-                values[m_var_offset + idx_] += m_v_tick_size * (max_len - 1);
-                vol_lb += m_v_tick_size * (max_len - 1) * m_cons[0].m_coefs[m_var_offset + idx_];
+                values[idx_] += m_v_tick_size * (max_len - 1);
+                vol_lb += m_v_tick_size * (max_len - 1);
             }
             // printf("%ld,%ld\n", deficity, vol_lb);
         }
@@ -73,24 +95,23 @@ ResultStatus IpSolver::Solve() {
             }
             calc_constrains();
             if (m_vol_diff == 0) {
-                // printf("%d,%d,%d,%ld\n", pChoice[var_num - 3], pChoice[var_num - 2], pChoice[var_num - 1], m_amt_diff);
+                printf("%d,%d,%d,%ld\n", pChoice[var_num - 3], pChoice[var_num - 2], pChoice[var_num - 1], m_amt_diff);
                 if (m_amt_diff == 0) {
                     int64_t new_obj = calc_objective();
                     if (m_obj_value > new_obj) {
                         m_obj_value = new_obj;
-                        std::copy(choice.data() + m_var_offset, choice.data() + m_var_n, m_solution_idx.data() + m_var_offset);
+                        std::copy(choice.data(), choice.data() + m_real_n, m_solution_idx.data());
                     }
                 }
-                
             }
         } else {
-            printf("h\n");
+            // printf("h\n");
         }
 
         m_calc_cnt++;
-        if (m_calc_cnt % 10000 == 0) {
-            printf("n=%zu/%zu\n", m_calc_cnt, total);
-        }
+        // if (m_calc_cnt % 10000 == 0) {
+        //     printf("n=%zu/%zu\n", m_calc_cnt, total);
+        // }
 
         good = false;
         int check_bit = 1;
@@ -119,10 +140,7 @@ ResultStatus IpSolver::Solve() {
     } while (good);
     
     if (m_obj_value != std::numeric_limits<int64_t>::max()) {
-        for (int32_t i = 0; i < m_var_n; i++) {
-            int64_t fix_val = m_lbs[i] + m_v_tick_size * m_solution_idx[i];
-            m_solution[m_var_reorder_idx[i]] = fix_val;
-        }
+        fill_solution();
         return OPTIMAL;
     } else {
         return NOT_SOLVED;
@@ -131,23 +149,36 @@ ResultStatus IpSolver::Solve() {
 
 int64_t IpSolver::calc_objective() {
     int64_t result = 0;
-    for (int j = m_var_offset; j < m_var_n; ++j) {
-        result += m_obj_coefs[j] * values[j];
+    for (int j = 0; j < m_real_n; ++j) {
+        result += m_obj_coefs[j] * std::abs(values[j]);
     }
     return result;
 }
 
 void IpSolver::fill_value() {
-    for (int32_t i = m_var_offset; i < m_var_n; i++) {
-        values[i] = m_lbs[i] + m_v_tick_size * choice[i];
+    for (int32_t i = 0; i < m_real_n; i++) {
+        values[i] = m_v_tick_size * choice[i];
+    }
+}
+
+void IpSolver::fill_solution() {
+    int32_t half_n = m_var_n / 2;
+    for (int32_t i = 0; i < half_n; i++) {
+        int64_t fix_val = m_lbs[i] + m_v_tick_size * m_solution_idx[i];
+        m_solution[m_var_reorder_idx[i]] = fix_val;
+    }
+    for (int32_t i = 0; i < half_n; i++) {
+        if (m_solution[i] < 0) { // give value to neg part to minimize obj
+            m_solution[i + half_n] = -m_solution[i];
+            m_solution[i] = 0;
+        }
     }
 }
 
 void IpSolver::calc_constrains() {
     m_vol_diff = 0;
     m_amt_diff = 0;
-    for (int i = m_var_offset; i < m_var_n; ++i) {
-        // m_vol_diff += m_cons[0].m_coefs[i] * values[i];
+    for (int i = 0; i < m_real_n; ++i) {
         m_vol_diff += values[i];
         m_amt_diff += m_cons[1].m_coefs[i] * values[i];
     }
@@ -163,6 +194,12 @@ const int64_t* IpSolver::Solution() const {
 }
 
 bool IpSolver::ReFormula() {
+    m_vol_target = m_cons[0].m_ub;
+    m_amt_target = m_cons[1].m_ub;
+    if (m_amt_target <= 0 || m_vol_target <= 0) {
+        return false;
+    }
+    
     if (m_cons.size() != 2) {
         throw std::runtime_error("expect two valid constrains");
     }
@@ -173,60 +210,54 @@ bool IpSolver::ReFormula() {
     }
     int half_n = m_var_n / 2;
 
-    for (int32_t i = 0; i < m_var_n; i++) {
+    for (int32_t i = 0; i < half_n; i++) {
         auto lb_ = m_lbs[i];
         auto ub_ = m_ubs[i];
-        if (lb_ % m_v_tick_size != 0 || ub_ % m_v_tick_size != 0) {
+        auto lb1_ = m_lbs[i + half_n];
+        auto ub1_ = m_ubs[i + half_n];
+        if (lb_ % m_v_tick_size != 0 || ub_ % m_v_tick_size != 0 || lb1_ % m_v_tick_size != 0 || ub1_ % m_v_tick_size != 0) {
             throw std::runtime_error("expect var " + std::to_string(i) + " lb/ub by tick_size");
         }
-        if (lb_ > ub_) {
+        if (lb_ > ub_ || lb1_ > ub1_) {
             throw std::runtime_error("expect var " + std::to_string(i) + " lb <= ub");
         }
-        if (i >= half_n) { // half neg
-            m_lbs[i] = -ub_;
-            m_ubs[i] = -lb_;
-            m_cons[0].m_coefs[i] = -m_cons[0].m_coefs[i];
-            m_cons[1].m_coefs[i] = -m_cons[1].m_coefs[i];
-            m_obj_coefs[i] = -m_obj_coefs[i];
+        m_lbs[i] = lb_ - ub1_;
+        m_ubs[i] = ub_ - lb1_;
+        m_lens[i] = ((ub_ - lb1_) - (lb_ - ub1_)) / m_v_tick_size + 1L;
+    }
+
+    m_real_n = 0;
+    int zero_n = 0;
+    for (int i = 0; i < half_n; i++) {
+        m_var_reorder_idx[i] = i;
+        int64_t fix_val = m_lbs[i];
+        if (fix_val != 0) {
+            m_vol_target -= fix_val;
+            m_amt_target -= fix_val * m_cons[1].m_coefs[i];
+        }
+        if (m_lens[i] == 1) {
+            m_var_reorder_idx[m_var_n - 1 - zero_n] = i;
+            zero_n++;
+        } else {
+            m_var_reorder_idx[half_n + m_real_n] = i; 
+            m_real_n++;
         }
     }
 
-    std::vector<VarSort> m_var_sorts;
-    for (int32_t i = 0; i < m_var_n; i++) {
-        m_var_sorts.push_back(VarSort{i, m_lens[i]});
-    }
-    std::sort(m_var_sorts.begin(), m_var_sorts.end(), [](auto& l, auto& r) {
-        return l.len < r.len;
-    });
-    for (int i = 0; i < m_var_n; i++) {
-        m_var_reorder_idx[i] = m_var_sorts[i].idx;
+    if (m_real_n != half_n) {
+        std::vector<int64_t> tmp(half_n);
+        std::vector<int32_t> tmp_int(half_n);
+        reorder_inplace(m_obj_coefs.data(), tmp.data(), m_var_reorder_idx.data(), half_n);
+        reorder_inplace(m_lbs.data(), tmp.data(), m_var_reorder_idx.data(), half_n);
+        reorder_inplace(m_ubs.data(), tmp.data(), m_var_reorder_idx.data(), half_n);
+        reorder_inplace(m_lens.data(), tmp_int.data(), m_var_reorder_idx.data(), half_n);
+        for (size_t i = 0; i < 2; i++) {
+            auto& coefs = m_cons[i].m_coefs;
+            reorder_inplace(coefs.data(), tmp.data(), m_var_reorder_idx.data(), half_n);
+        }
     }
     
-    std::vector<int64_t> tmp(m_var_n);
-    std::vector<int32_t> tmp_int(m_var_n);
-    reorder_inplace(m_obj_coefs.data(), tmp.data(), m_var_reorder_idx.data(), m_var_n);
-    reorder_inplace(m_lbs.data(), tmp.data(), m_var_reorder_idx.data(), m_var_n);
-    reorder_inplace(m_ubs.data(), tmp.data(), m_var_reorder_idx.data(), m_var_n);
-    reorder_inplace(m_lens.data(), tmp_int.data(), m_var_reorder_idx.data(), m_var_n);
-    for (size_t i = 0; i < 2; i++) {
-        auto& coefs = m_cons[i].m_coefs;
-        reorder_inplace(coefs.data(), tmp.data(), m_var_reorder_idx.data(), m_var_n);
-    }
-    for (; m_var_offset < m_var_n; m_var_offset++) {
-        if (m_var_sorts[m_var_offset].len > 1) {
-            break;
-        }
-    }
-    m_vol_target = m_cons[0].m_ub;
-    m_amt_target = m_cons[1].m_ub;
-    m_solution.resize(m_var_n);
-    for (int i = 0; i < m_var_offset; i++) {
-        int64_t fix_val = m_lbs[i];
-        if (fix_val != 0) {
-            m_vol_target -= fix_val * m_cons[0].m_coefs[i];
-            m_amt_target -= fix_val * m_cons[1].m_coefs[i];
-        }
-    }
+    
     return true;
 }
 
@@ -240,6 +271,7 @@ void IpSolver::init(int n_var, int n_constraint) {
     m_lens.resize(n_var);
     m_obj_coefs.resize(n_var);
     m_var_reorder_idx.resize(n_var, 0);
+    m_solution.resize(m_var_n, 0);
     std::fill(m_obj_coefs.begin(), m_obj_coefs.end(), 0);
 
     m_cons.resize(n_constraint);
@@ -332,8 +364,8 @@ std::string IpSolver::to_string_or_objective() {
 std::string IpSolver::to_string_or_solution() {
     std::string str;
     for (size_t i = 0; i < m_solution.size(); ++i) {
-        str += std::to_string(m_solution[i]) + ",";
-        if (i + 1 != m_solution.size()) str += "";
+        str += std::to_string(m_solution[i]);
+        if (i + 1 != m_solution.size()) str += ",";
     }
     return str;
 }
