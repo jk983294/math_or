@@ -78,10 +78,45 @@ ResultStatus IpSolver::Solve() {
                 vol_lb += m_v_tick_size * (max_len - 1);
                 amt_lb += m_v_tick_size * (max_len - 1) * pAmtCoef[idx_];
             }
-            // printf("%ld,%ld\n", deficity, vol_lb);
         }
-        if (idx_ < 0) {
+        m_amt_diff = amt_lb - m_amt_target;
+        if (idx_ < 0 || m_amt_diff < 0) {
             return NOT_SOLVED;
+        }
+        if (m_amt_diff > 0) {
+            int least_idx = var_num - 1;
+            int prev_idx = least_idx - 1;
+            while (prev_idx >= 0) {
+                // printf("%ld,%ld\n", m_amt_diff, m_amt_target);
+                if (prev_idx >= least_idx) {
+                    prev_idx = least_idx - 1;
+                    continue;
+                }
+                int64_t tick_diff = (pAmtCoef[least_idx] - pAmtCoef[prev_idx]) * m_v_tick_size;
+                int max_tick_change = m_amt_diff / tick_diff;
+                int prev_left = pMaxChoice[prev_idx] - pChoice[prev_idx] - 1;
+                int least_left = pChoice[least_idx];
+                if (max_tick_change > prev_left) {
+                    max_tick_change = prev_left;
+                }
+                if (max_tick_change > least_left) {
+                    max_tick_change = pChoice[least_idx];
+                }
+                // printf("%ld,%ld,%ld,%d,\n", m_amt_diff, m_amt_target, tick_diff, max_tick_change);
+                if (max_tick_change > 0) {
+                    pChoice[least_idx] -= max_tick_change;
+                    pChoice[prev_idx] += max_tick_change;
+                    amt_lb -= tick_diff * max_tick_change;
+                    m_amt_diff = amt_lb - m_amt_target;
+                }
+                if (m_amt_diff < tick_diff) {
+                    break;
+                }
+                if (pChoice[least_idx] == 0) {
+                    least_idx--;
+                }
+            }
+            if (prev_idx < 0) return NOT_SOLVED;
         }
     }
 
@@ -92,30 +127,84 @@ ResultStatus IpSolver::Solve() {
     do {
         int64_t deficity = m_vol_target - vol_lb;
         int len_idx = static_cast<int32_t>(deficity / m_v_tick_size);
-        if (len_idx <= max_len_least_level) {
-            if (len_idx > 0) {
-                pChoice[var_num - 1] = len_idx;
-                pValue[var_num - 1] += m_v_tick_size * len_idx;
-                vol_lb += m_v_tick_size * len_idx;
-                amt_lb += m_v_tick_size * len_idx * pAmtCoef[var_num - 1];
-            }
-            m_vol_diff =  vol_lb - m_vol_target;
-            m_amt_diff = amt_lb - m_amt_target;
-//            calc_constrains();
-            if (m_vol_diff == 0) {
-//                printf("%d,%d,%d,%ld\n", pChoice[var_num - 3], pChoice[var_num - 2], pChoice[var_num - 1], m_amt_diff);
-                if (m_amt_diff == 0) {
-                    int64_t new_obj = calc_objective();
-                    if (m_obj_value > new_obj) {
-                        m_obj_value = new_obj;
-                        std::copy(choice.data(), choice.data() + m_real_n, m_solution_idx.data());
+        if (len_idx >= 0) {
+            if (len_idx <= max_len_least_level) {
+                if (len_idx > 0) {
+                    pChoice[var_num - 1] = len_idx;
+                    pValue[var_num - 1] += m_v_tick_size * len_idx;
+                    vol_lb += m_v_tick_size * len_idx;
+                    amt_lb += m_v_tick_size * len_idx * pAmtCoef[var_num - 1];
+                }
+                m_vol_diff =  vol_lb - m_vol_target;
+                m_amt_diff = amt_lb - m_amt_target;
+                if (m_vol_diff == 0) {
+                    if (m_amt_diff > 0) { // go on shift operation
+                        int least_idx = var_num - 1;
+                        int prev_idx = least_idx - 1;
+                        while (prev_idx >= 0) {
+                            if (prev_idx >= least_idx) {
+                                prev_idx = least_idx - 1;
+                                continue;
+                            }
+                            int64_t tick_diff = (pAmtCoef[least_idx] - pAmtCoef[prev_idx]) * m_v_tick_size;
+                            int max_tick_change = m_amt_diff / tick_diff;
+                            int prev_left = pMaxChoice[prev_idx] - pChoice[prev_idx] - 1;
+                            int least_left = pChoice[least_idx];
+                            if (max_tick_change > prev_left) {
+                                max_tick_change = prev_left;
+                            }
+                            if (max_tick_change > least_left) {
+                                max_tick_change = pChoice[least_idx];
+                            }
+                            if (max_tick_change > 0) {
+                                pChoice[least_idx] -= max_tick_change;
+                                pChoice[prev_idx] += max_tick_change;
+                                amt_lb -= tick_diff * max_tick_change;
+                                m_amt_diff = amt_lb - m_amt_target;
+                                last_amt_diff = 0;
+                            }
+                            if (m_amt_diff < tick_diff) {
+                                break;
+                            }
+                            if (pChoice[least_idx] == 0) {
+                                least_idx--;
+                            }
+                        }
+                        if (prev_idx < 0) {
+                            break;
+                        }
+                        // printf("adj choice=%d,%d,%d,%d,%d,%ld\n", pChoice[var_num - 5], pChoice[var_num - 4], pChoice[var_num - 3], pChoice[var_num - 2], pChoice[var_num - 1], m_amt_diff);
+                        // if (pChoice[var_num - 3] == 112 && pChoice[var_num - 2] == 1 && pChoice[var_num - 1] == 90) {
+                        //     printf("h\n");
+                        // }
+                    }
+
+                    if (m_amt_diff == 0) {
+                        int64_t new_obj = calc_objective();
+                        if (m_obj_value > new_obj) {
+                            m_obj_value = new_obj;
+                            std::copy(choice.data(), choice.data() + m_real_n, m_solution_idx.data());
+                        }
                     }
                 }
+            } else {
+                cnt_skip++;
             }
         } else {
-            printf("%d,%d,%d,%ld\n", pChoice[var_num - 3], pChoice[var_num - 2], pChoice[var_num - 1], m_amt_diff);
-            cnt_skip++;
-            // printf("h\n");
+            int idx_ = 0;
+            for (; idx_ < var_num; idx_++) {
+                if (pChoice[idx_] > 0) { // find max col idx
+                    for (int j = idx_ + 1; j < var_num; j++) {
+                        int64_t v_delta = m_v_tick_size * (pMaxChoice[j] - pChoice[j] - 1);
+                        pValue[j] += v_delta;
+                        vol_lb += v_delta;
+                        amt_lb += v_delta * pAmtCoef[j];
+                        pChoice[j] = pMaxChoice[j] - 1;
+                    }
+                    last_amt_diff = 0;
+                    break;
+                }
+            }
         }
 
         m_calc_cnt++;
@@ -149,6 +238,10 @@ ResultStatus IpSolver::Solve() {
         }
         if (check_bit == 1) last_amt_diff = m_amt_diff;
         else last_amt_diff = 0;
+        // printf("choice=%d,%d,%d,%d,%d,%ld\n", pChoice[var_num - 5], pChoice[var_num - 4], pChoice[var_num - 3], pChoice[var_num - 2], pChoice[var_num - 1], m_amt_diff);
+        // if (pChoice[var_num - 5] == 0 && pChoice[var_num - 4] == 1 && pChoice[var_num - 3] == 39 && pChoice[var_num - 2] == 0 && pChoice[var_num - 1] == 0) {
+        //     printf("h\n");
+        // }
     } while (good);
     printf("cnt=%zu,%zu\n", cnt_skip, m_calc_cnt);
     
@@ -163,7 +256,8 @@ ResultStatus IpSolver::Solve() {
 int64_t IpSolver::calc_objective() {
     int64_t result = 0;
     for (int j = 0; j < m_real_n; ++j) {
-        result += m_obj_coefs[j] * std::abs(values[j]);
+        int64_t v = m_lbs[j] + m_v_tick_size * choice[j];
+        result += m_obj_coefs[j] * std::abs(v);
     }
     return result;
 }
