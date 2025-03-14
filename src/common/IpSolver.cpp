@@ -52,27 +52,31 @@ ResultStatus IpSolver::Solve() {
     printf("avg_px=%ld, check_avg_px=%d\n", m_avg_px, check_avg_px);
 
     int64_t vol_lb = 0;
+    int64_t amt_lb = 0;
     { // to lower bound
         fill_value();
         calc_constrains();
         vol_lb = m_vol_diff + m_vol_target;
+        amt_lb = m_amt_diff + m_amt_target;
         if (vol_lb > m_vol_target) {
             return NOT_SOLVED;
         }
         int idx_ = var_num - 1;
         for (; idx_ >= 0; idx_--) {
             int64_t deficity = m_vol_target - vol_lb;
-            int len_idx = deficity / m_v_tick_size;
+            int len_idx = static_cast<int32_t>(deficity / m_v_tick_size);
             int32_t max_len = pMaxChoice[idx_];
             if (len_idx < max_len) {
                 pChoice[idx_] = len_idx;
                 pValue[idx_] += m_v_tick_size * len_idx;
                 vol_lb += m_v_tick_size * len_idx;
+                amt_lb += m_v_tick_size * len_idx * pAmtCoef[idx_];
                 break;
             } else {
                 pChoice[idx_] = max_len - 1;
                 values[idx_] += m_v_tick_size * (max_len - 1);
                 vol_lb += m_v_tick_size * (max_len - 1);
+                amt_lb += m_v_tick_size * (max_len - 1) * pAmtCoef[idx_];
             }
             // printf("%ld,%ld\n", deficity, vol_lb);
         }
@@ -83,19 +87,23 @@ ResultStatus IpSolver::Solve() {
 
     int32_t max_len_least_level = pMaxChoice[var_num - 1];
     int64_t last_amt_diff = 0;
+    uint64_t cnt_skip = 0;
     bool good = false;
     do {
         int64_t deficity = m_vol_target - vol_lb;
-        int len_idx = deficity / m_v_tick_size;
+        int len_idx = static_cast<int32_t>(deficity / m_v_tick_size);
         if (len_idx <= max_len_least_level) {
             if (len_idx > 0) {
                 pChoice[var_num - 1] = len_idx;
                 pValue[var_num - 1] += m_v_tick_size * len_idx;
                 vol_lb += m_v_tick_size * len_idx;
+                amt_lb += m_v_tick_size * len_idx * pAmtCoef[var_num - 1];
             }
-            calc_constrains();
+            m_vol_diff =  vol_lb - m_vol_target;
+            m_amt_diff = amt_lb - m_amt_target;
+//            calc_constrains();
             if (m_vol_diff == 0) {
-                printf("%d,%d,%d,%ld\n", pChoice[var_num - 3], pChoice[var_num - 2], pChoice[var_num - 1], m_amt_diff);
+//                printf("%d,%d,%d,%ld\n", pChoice[var_num - 3], pChoice[var_num - 2], pChoice[var_num - 1], m_amt_diff);
                 if (m_amt_diff == 0) {
                     int64_t new_obj = calc_objective();
                     if (m_obj_value > new_obj) {
@@ -105,6 +113,8 @@ ResultStatus IpSolver::Solve() {
                 }
             }
         } else {
+            printf("%d,%d,%d,%ld\n", pChoice[var_num - 3], pChoice[var_num - 2], pChoice[var_num - 1], m_amt_diff);
+            cnt_skip++;
             // printf("h\n");
         }
 
@@ -125,10 +135,12 @@ ResultStatus IpSolver::Solve() {
                 ++pChoice[i];
                 pValue[i] += m_v_tick_size;
                 vol_lb += m_v_tick_size;
+                amt_lb += m_v_tick_size * pAmtCoef[i];
                 for (int j = i + 1; j < var_num; j++) {
                     int64_t v_delta = m_v_tick_size * pChoice[j];
                     pValue[j] -= v_delta;
                     vol_lb -= v_delta;
+                    amt_lb -= v_delta * pAmtCoef[j];
                     pChoice[j] = 0;
                 }
                 good = true;
@@ -138,6 +150,7 @@ ResultStatus IpSolver::Solve() {
         if (check_bit == 1) last_amt_diff = m_amt_diff;
         else last_amt_diff = 0;
     } while (good);
+    printf("cnt=%zu,%zu\n", cnt_skip, m_calc_cnt);
     
     if (m_obj_value != std::numeric_limits<int64_t>::max()) {
         fill_solution();
@@ -242,6 +255,10 @@ bool IpSolver::ReFormula() {
             m_var_reorder_idx[half_n + m_real_n] = i; 
             m_real_n++;
         }
+    }
+    for (int i = 0; i < half_n; ++i) {
+        m_var_reorder_idx[i] = m_var_reorder_idx[half_n + i];
+//        m_var_reorder_idx[i] = m_var_reorder_idx[m_var_n - 1 - i]; // reverse copy
     }
 
     if (m_real_n != half_n) {
