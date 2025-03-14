@@ -25,11 +25,7 @@ ResultStatus IpSolver::Solve() {
     if (m_amt_target < 0 || m_vol_target < 0) {
         throw std::runtime_error("should not happen!");
     }
-    m_avg_px = m_amt_target / m_vol_target;
-    bool check_avg_px = false;
-    if (m_amt_target % m_vol_target == 0) {
-        check_avg_px = true;
-    }
+    
     choice.resize(m_var_n, 0);
     m_solution_idx.resize(m_var_n, 0);
     values.resize(m_var_n);
@@ -42,14 +38,6 @@ ResultStatus IpSolver::Solve() {
     auto* pMaxChoice = m_lens.data();
     auto* pValue = values.data();
     auto* pAmtCoef = m_cons[1].m_coefs.data();
-
-    int pass_avg_idx = 0;
-    for (; pass_avg_idx < var_num; pass_avg_idx++) {
-        if (pAmtCoef[pass_avg_idx] >= m_avg_px) break;
-    }
-    if (var_num == pass_avg_idx) return NOT_SOLVED;
-
-    printf("avg_px=%ld, check_avg_px=%d\n", m_avg_px, check_avg_px);
 
     int64_t vol_lb = 0;
     int64_t amt_lb = 0;
@@ -123,6 +111,7 @@ ResultStatus IpSolver::Solve() {
     int32_t max_len_least_level = pMaxChoice[var_num - 1];
     int64_t last_amt_diff = 0;
     uint64_t cnt_skip = 0;
+    uint64_t match_idx = 0, neg_incre_idx = 0;
     bool good = false;
     do {
         int64_t deficity = m_vol_target - vol_lb;
@@ -185,14 +174,14 @@ ResultStatus IpSolver::Solve() {
                             m_obj_value = new_obj;
                             std::copy(choice.data(), choice.data() + m_real_n, m_solution_idx.data());
                         }
+                        match_idx = m_calc_cnt;
                     }
                 }
             } else {
                 cnt_skip++;
             }
         } else {
-            int idx_ = 0;
-            for (; idx_ < var_num; idx_++) {
+            for (int idx_ = 0; idx_ < var_num; idx_++) {
                 if (pChoice[idx_] > 0) { // find max col idx
                     for (int j = idx_ + 1; j < var_num; j++) {
                         int64_t v_delta = m_v_tick_size * (pMaxChoice[j] - pChoice[j] - 1);
@@ -207,11 +196,6 @@ ResultStatus IpSolver::Solve() {
             }
         }
 
-        m_calc_cnt++;
-        // if (m_calc_cnt % 10000 == 0) {
-        //     printf("n=%zu/%zu\n", m_calc_cnt, total);
-        // }
-
         good = false;
         int check_bit = 1;
         if (last_amt_diff != 0 && m_amt_diff != 0) {
@@ -219,6 +203,36 @@ ResultStatus IpSolver::Solve() {
                 check_bit = 2;
             }
         }
+        // printf("choice=%d,%d,%d,%d,%d,%ld\n", pChoice[var_num - 5], pChoice[var_num - 4], pChoice[var_num - 3], pChoice[var_num - 2], pChoice[var_num - 1], m_amt_diff);
+        // if (pChoice[var_num - 5] == 0 && pChoice[var_num - 4] == 0 && pChoice[var_num - 3] == 114 && pChoice[var_num - 2] == 0 && pChoice[var_num - 1] == 89) {
+        //     printf("h\n");
+        // }
+        
+        if (last_amt_diff > m_amt_diff && m_amt_diff < 0 && last_amt_diff < 0 && m_calc_cnt != match_idx + 2UL) {
+            int shift_bit = 1;
+            if (neg_incre_idx + 1 == m_calc_cnt) {
+                shift_bit = 0;
+            }
+            // printf("neg choice=%d,%d,%d,%d,%d,%ld,%zu,%zu,%zu\n", 
+            //     pChoice[var_num - 5], pChoice[var_num - 4], pChoice[var_num - 3], pChoice[var_num - 2], pChoice[var_num - 1], 
+            //     m_amt_diff, match_idx, neg_incre_idx, m_calc_cnt);
+            for (int idx_ = 0; idx_ < var_num; idx_++) {
+                if (pChoice[idx_] > 0) { // find max col idx
+                    for (int j = idx_ + shift_bit; j < var_num; j++) {
+                        int64_t v_delta = m_v_tick_size * (pMaxChoice[j] - pChoice[j] - 1);
+                        pValue[j] += v_delta;
+                        vol_lb += v_delta;
+                        amt_lb += v_delta * pAmtCoef[j];
+                        pChoice[j] = pMaxChoice[j] - 1;
+                    }
+                    break;
+                }
+            }
+            neg_incre_idx = m_calc_cnt;
+        } else {
+            neg_incre_idx = 0;
+        }
+
         for (int i = var_num - check_bit - 1; i >= 0; --i) {
             if (pChoice[i] != pMaxChoice[i] - 1) {
                 ++pChoice[i];
@@ -236,11 +250,10 @@ ResultStatus IpSolver::Solve() {
                 break;
             }
         }
-        if (check_bit == 1) last_amt_diff = m_amt_diff;
-        else last_amt_diff = 0;
-        // printf("choice=%d,%d,%d,%d,%d,%ld\n", pChoice[var_num - 5], pChoice[var_num - 4], pChoice[var_num - 3], pChoice[var_num - 2], pChoice[var_num - 1], m_amt_diff);
-        // if (pChoice[var_num - 5] == 0 && pChoice[var_num - 4] == 1 && pChoice[var_num - 3] == 39 && pChoice[var_num - 2] == 0 && pChoice[var_num - 1] == 0) {
-        //     printf("h\n");
+        last_amt_diff = m_amt_diff;
+        m_calc_cnt++;
+        // if (m_calc_cnt % 10000 == 0) {
+        //     printf("n=%zu/%zu\n", m_calc_cnt, total);
         // }
     } while (good);
     printf("cnt=%zu,%zu\n", cnt_skip, m_calc_cnt);

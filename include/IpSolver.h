@@ -42,7 +42,6 @@ public:
     int64_t m_amt_target{0};
     int64_t m_vol_diff{0};
     int64_t m_amt_diff{0};
-    int64_t m_avg_px{0};
     std::vector<IpConstraint> m_cons;
     std::vector<int64_t> m_obj_coefs;
     std::vector<int64_t> m_solution;
