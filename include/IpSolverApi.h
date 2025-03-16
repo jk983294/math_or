@@ -27,7 +27,7 @@ struct IpSolverApi {
     virtual void SetVarBounds(const std::vector<int64_t>& lbs, const std::vector<int64_t>& ubs) = 0;
     virtual void SetConstraintCoefs(int c_idx, const std::vector<int64_t>& coefs) = 0;
     virtual void SetConstraintBounds(const std::vector<int64_t>& lbs, const std::vector<int64_t>& ubs) = 0;
-    virtual ResultStatus Solve() = 0;
+    virtual ResultStatus Solve(int64_t _vol_target, int64_t _amt_target) = 0;
     virtual int64_t ObjValue() const = 0;
     virtual const int64_t* Solution() const = 0;
     uint64_t iterations() const { return m_calc_cnt; }

@@ -18,7 +18,7 @@ struct IpSolver final : public IpSolverApi {
     void SetConstraintBounds(const std::vector<int64_t>& lbs, const std::vector<int64_t>& ubs) final;
     void SetConstraintCoefs(int c_idx, const std::vector<int64_t>& coefs) final;
     void SetObjectiveCoef(int idx, int coef) final;
-    ResultStatus Solve() final;
+    ResultStatus Solve(int64_t _vol_target, int64_t _amt_target) final;
     int64_t ObjValue() const final;
     const int64_t* Solution() const final;
 
@@ -28,27 +28,15 @@ struct IpSolver final : public IpSolverApi {
     std::string to_string_or_solution() final;
 
 private:
-    bool ReFormula();
-    void calc_constrains();
-    void fill_value();
     void fill_solution();
-    int64_t calc_objective();
 
 public:
     int m_var_n{0};
-    int m_real_n{0};
-    
-    int64_t m_vol_target{0};
-    int64_t m_amt_target{0};
-    int64_t m_vol_diff{0};
-    int64_t m_amt_diff{0};
     std::vector<IpConstraint> m_cons;
     std::vector<int64_t> m_obj_coefs;
     std::vector<int64_t> m_solution;
-    std::vector<int64_t> values;
     std::vector<int64_t> m_lbs; // var's lb
     std::vector<int64_t> m_ubs; // var's ub
-    std::vector<int> m_var_reorder_idx;
     std::vector<int> m_lens;
     std::vector<int> choice;
     std::vector<int> m_solution_idx;
