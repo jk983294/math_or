@@ -181,12 +181,8 @@ ResultStatus IpSolver::Solve(int64_t _vol_target, int64_t _amt_target, uint64_t 
         } else { // last price has no capacity, increase the most left bit
             for (int idx_ = 0; idx_ < var_num; idx_++) {
                 if (pChoice[idx_] > 0) { // find max col idx
-                    for (int j = idx_ + 1; j < var_num; j++) {
-                        int64_t v_delta = m_v_tick_size * (pMaxChoice[j] - pChoice[j] - 1);
-                        vol_lb += v_delta;
-                        amt_lb += v_delta * pAmtCoef[j];
-                        pChoice[j] = pMaxChoice[j] - 1;
-                    }
+                    int tmp_bits = (var_num - idx_ - 1);
+                    if (check_bit < tmp_bits) check_bit = tmp_bits;
                     break;
                 }
             }
@@ -195,7 +191,7 @@ ResultStatus IpSolver::Solve(int64_t _vol_target, int64_t _amt_target, uint64_t 
         bool good = false;
         if (last_amt_diff != 0 && m_amt_diff != 0) {
             if ((last_amt_diff > m_amt_diff && m_amt_diff < 0) || (m_amt_diff > last_amt_diff && last_amt_diff > 0)) {
-                check_bit = 2;
+                if (check_bit < 2) check_bit = 2;
             }
         }
         // printf("choice=%d,%d,%d,%d,%d,%ld\n", pChoice[var_num - 5], pChoice[var_num - 4], pChoice[var_num - 3], pChoice[var_num - 2], pChoice[var_num - 1], m_amt_diff);
@@ -213,12 +209,8 @@ ResultStatus IpSolver::Solve(int64_t _vol_target, int64_t _amt_target, uint64_t 
             //     m_amt_diff, match_idx, neg_incre_idx, m_calc_cnt);
             for (int idx_ = 0; idx_ < var_num; idx_++) {
                 if (pChoice[idx_] > 0) { // find max col idx
-                    for (int j = idx_ + shift_bit; j < var_num; j++) {
-                        int64_t v_delta = m_v_tick_size * (pMaxChoice[j] - pChoice[j] - 1);
-                        vol_lb += v_delta;
-                        amt_lb += v_delta * pAmtCoef[j];
-                        pChoice[j] = pMaxChoice[j] - 1;
-                    }
+                    int tmp_bits = (var_num - idx_ - shift_bit);
+                    if (check_bit < tmp_bits) check_bit = tmp_bits;
                     break;
                 }
             }
