@@ -21,13 +21,13 @@ struct IpSolverApi {
     virtual void init(int n_var, int n_constraint) = 0;
     virtual void SetVarBound(int idx, int64_t lb, int64_t ub) = 0;
     virtual void SetConstraintBound(int idx, int64_t lb, int64_t ub) = 0;
-    virtual void SetConstraintCoef(int c_idx, int v_idx, int64_t coef) = 0;
+    virtual void SetConstraintCoef(int c_idx, int v_idx, int32_t coef) = 0;
     virtual void SetObjectiveCoef(int idx, int coef) = 0;
-    virtual void SetObjectiveCoefs(const std::vector<int64_t>& coefs) = 0;
+    virtual void SetObjectiveCoefs(const std::vector<int32_t>& coefs) = 0;
     virtual void SetVarBounds(const std::vector<int64_t>& lbs, const std::vector<int64_t>& ubs) = 0;
-    virtual void SetConstraintCoefs(int c_idx, const std::vector<int64_t>& coefs) = 0;
+    virtual void SetConstraintCoefs(int c_idx, const std::vector<int32_t>& coefs) = 0;
     virtual void SetConstraintBounds(const std::vector<int64_t>& lbs, const std::vector<int64_t>& ubs) = 0;
-    virtual ResultStatus Solve(int64_t _vol_target, int64_t _amt_target) = 0;
+    virtual ResultStatus Solve(int64_t _vol_target, int64_t _amt_target, uint64_t max_round) = 0;
     virtual int64_t ObjValue() const = 0;
     virtual const int64_t* Solution() const = 0;
     uint64_t iterations() const { return m_calc_cnt; }
@@ -37,9 +37,9 @@ struct IpSolverApi {
     virtual std::string to_string_or_objective() = 0;
     virtual std::string to_string_or_solution() = 0;
 
-    int64_t m_v_tick_size{100};
-    int64_t m_p_tick_size{100};
-    int64_t m_obj_value{0};
-    uint64_t m_calc_cnt{0};
+    int32_t m_v_tick_size{100};
+    int32_t m_p_tick_size{100};
+    int64_t m_obj_value{0L};
+    uint64_t m_calc_cnt{0UL};
 };
 }

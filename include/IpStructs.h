@@ -13,7 +13,7 @@ struct VarSort {
 struct IpConstraint {
     int64_t m_lb{0};
     int64_t m_ub{0};
-    std::vector<int64_t> m_coefs;
+    std::vector<int32_t> m_coefs;
     void SetBound(int64_t lb, int64_t ub);
     void Resize(int n_vars);
     void Clear();

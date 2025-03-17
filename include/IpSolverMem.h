@@ -8,7 +8,7 @@
 #include <IpSolverApi.h>
 
 namespace ips {
-struct IpSolver final : public IpSolverApi {
+struct IpSolverMem final : public IpSolverApi {
     void init(int n_var, int n_constraint) final;
     void SetVarBound(int idx, int64_t lb, int64_t ub) final;
     void SetConstraintBound(int idx, int64_t lb, int64_t ub) final;
@@ -27,18 +27,21 @@ struct IpSolver final : public IpSolverApi {
     std::string to_string_or_objective() final;
     std::string to_string_or_solution() final;
 
+    void SetVarBoundsWithNeg(const std::vector<int64_t>& lbs, const std::vector<int64_t>& ubs);
+
 private:
     void fill_solution();
 
 public:
     int m_var_n{0};
-    std::vector<IpConstraint> m_cons;
-    std::vector<int32_t> m_obj_coefs;
-    std::vector<int64_t> m_solution;
-    std::vector<int64_t> m_lbs; // var's lb
-    std::vector<int64_t> m_ubs; // var's ub
-    std::vector<int> m_lens;
-    std::vector<int> choice;
-    std::vector<int> m_solution_idx;
+    std::vector<int64_t> m_datum;
+    int64_t* m_ubs{nullptr};
+    int64_t* m_solution{nullptr};
+    int64_t* m_lbs{nullptr};
+    int32_t* pAmtCoef{nullptr};
+    int32_t* m_obj_coefs{nullptr};
+    int32_t* pMaxChoice{nullptr};
+    int32_t* pChoice{nullptr};
+    int32_t* m_solution_idx{nullptr};
 };
 }
